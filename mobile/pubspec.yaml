@@ -1,0 +1,21 @@
+name: smarthome_assistant
+description: SmartHome Electric Assistant - uy elektr tarmog'i va qurilmalarini ovozli boshqarish
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  web_socket_channel: ^3.0.1
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.1.0
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
