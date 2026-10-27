@@ -20,6 +20,9 @@ const DEVICES = {
   fridge: ['muzlatkich', 'холодильник'],
 };
 const SCENES = {
+  all_off: ['hamma chiroqni ochir', "hammasini o'chir", "barchasini o'chir", 'выключи все', 'выключи всё', 'погаси все'],
+  evening: ['oqshom rejimi', 'kechki rejim', 'вечерний режим', 'вечерний сценарий'],
+  morning: ['ertalabki rejim', 'ertalab rejim', 'uygondim', 'утренний режим', 'доброе утро'],
   leave_home: ['uydan ket', 'uydan chiq', 'ketyapman', 'ketdim', 'ухожу', 'ушел', 'ушёл', 'уход из дома'],
   good_night: ['xayrli tun', 'yotaman', 'uxlayman', 'спокойной ночи', 'доброй ночи', 'ложусь спать'],
 };

@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background: radial-gradient(circle at 50% 0%, #202028 0%, #131317 60%, #0C0C0F 100%);
+    background-attachment: fixed;
+    color: #FFFFFF;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Apple Control Center Frosted Glass & Capsule Styling */
+.control-center-panel {
+  background: rgba(38, 38, 46, 0.72);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+.control-tile {
+  background: rgba(50, 50, 58, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.control-tile:hover {
+  background: rgba(60, 60, 70, 0.75);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.control-tile:active {
+  transform: scale(0.98);
+}
+
+/* Custom smooth scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Pulsing radar animation for voice assistant */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(10, 132, 255, 0.7);
+  }
+  70% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 25px rgba(10, 132, 255, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(10, 132, 255, 0);
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}

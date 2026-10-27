@@ -1,0 +1,10 @@
+{
+  "name": "SmartHome Electric Assistant",
+  "description": "Smart home electricity assistant with real-time device control, voice commands (Uzbek and Russian), energy monitoring, safety alerts, and automated schedules.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

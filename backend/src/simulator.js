@@ -21,11 +21,20 @@ function start() {
       c.publish(`home/${d.id}/state`, JSON.stringify({ on: s.on, watts: +watts.toFixed(1) }));
     }
   }, 3000);
-  // Muzlatkich doim yoniq
-  c.on('connect', () => c.publish('home/kitchen-fridge/cmd', 'ON'));
-  return {
-    // Test uchun: qisqa tutashuvni taqlid qilish
+  instance = {
     spike(id, watts) { c.publish(`home/${id}/state`, JSON.stringify({ on: true, watts })); },
+    c,
   };
+  return instance;
 }
-module.exports = { start };
+
+let instance = null;
+
+module.exports = {
+  start,
+  spike: (id, watts) => {
+    if (instance) instance.spike(id, watts);
+  },
+  getInstance: () => instance,
+};
+
