@@ -44,9 +44,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _connect() {
-    final ch = widget.api.live();
-    _sub = ch.stream.listen((raw) {
+  Future<void> _connect() async {
+    try {
+      final ch = await widget.api.live().timeout(const Duration(seconds: 12));
+      if (!mounted) { await ch.sink.close(); return; }
+      _sub = ch.stream.listen((raw) {
       final m = jsonDecode(raw as String);
       switch (m['type']) {
         case 'snapshot':
@@ -62,7 +64,13 @@ class _HomeScreenState extends State<HomeScreen> {
         case 'alert':
           setState(() => alert = Alert(m['message'], m['level']));
       }
-    }, onDone: () => Future.delayed(const Duration(seconds: 3), () { if (mounted) _connect(); }));
+      }, onError: (Object error) {
+        if (mounted) setState(() => this.error = 'Jonli ulanish uzildi: $error');
+      }, onDone: () => Future.delayed(const Duration(seconds: 3), () { if (mounted) _connect(); }));
+    } catch (e) {
+      if (mounted) setState(() => error = 'Jonli ulanishda xatolik: $e');
+      Future.delayed(const Duration(seconds: 5), () { if (mounted) _connect(); });
+    }
   }
 
   @override
@@ -123,9 +131,14 @@ class _HomeScreenState extends State<HomeScreen> {
         subtitle: Text(!d.online ? 'Tarmoqda emas' : d.on ? '${d.watts.round()} W' : 'O\'chiq'),
         value: d.on,
         onChanged: d.online && !d.essential
-            ? (v) {
-                setState(() => devices[d.id] = d.copyWith(on: v));
-                widget.api.power(d.id, v);
+            ? (v) async {
+                try {
+                  await widget.api.power(d.id, v);
+                  if (mounted) setState(() => error = 'Buyruq yuborildi, qurilma tasdig‘i kutilmoqda.');
+                } catch (e) {
+                  if (mounted) setState(() => error = 'Buyruq bajarilmadi: $e');
+                  await _load();
+                }
               }
             : null,
       ),

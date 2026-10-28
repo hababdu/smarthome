@@ -9,20 +9,20 @@ const cfg = require('./config');
 
 const T = {
   uz: {
-    on: (n) => `${n} yoqildi`, off: (n) => `${n} o'chirildi`,
+    on: (n) => `${n} uchun yoqish buyrug'i yuborildi, tasdiq kutilmoqda`, off: (n) => `${n} uchun o'chirish buyrug'i yuborildi, tasdiq kutilmoqda`,
     isOn: (n, w) => `Ha, ${n} yoniq, ${w} vatt`, isOff: (n) => `Yo'q, ${n} o'chiq`,
     offline: (n) => `${n} tarmoqda emas`,
-    notFound: "Bunday qurilmani topa olmadim", unknown: "Tushunmadim. Masalan: «mehmonxonadagi chiroqni o'chir»",
+    notFound: "Bunday qurilmani topa olmadim", unknown: "Tushunmadim. Masalan: «mehmonxonadagi chiroqni o'chir»", clarify: "Qaysi xona yoki qurilmani nazarda tutdingiz? Iltimos, aniqroq ayting.",
     scene: (n) => `${n} stsenariysi bajarildi`,
     sched: (n, t, a) => `Soat ${t} da ${n} ${a === 'on' ? 'yoqiladi' : "o'chiriladi"}`,
     noTime: "Qaysi soatda? Masalan: «soat 7 da kofevarkani yoq»",
     energy: (k, c) => `Bugun ${k} kilovatt-soat, taxminan ${c} so'm`,
   },
   ru: {
-    on: (n) => `Включила: ${n}`, off: (n) => `Выключила: ${n}`,
+    on: (n) => `Команда включения для ${n} отправлена, ожидается подтверждение`, off: (n) => `Команда выключения для ${n} отправлена, ожидается подтверждение`,
     isOn: (n, w) => `Да, включено: ${n}, ${w} ватт`, isOff: (n) => `Нет, выключено: ${n}`,
     offline: (n) => `${n} не в сети`,
-    notFound: 'Не нашла такое устройство', unknown: 'Не поняла. Например: «выключи свет в гостиной»',
+    notFound: 'Не нашла такое устройство', unknown: 'Не поняла. Например: «выключи свет в гостиной»', clarify: 'Уточните, пожалуйста, комнату или конкретное устройство.',
     scene: (n) => `Сценарий «${n}» выполнен`,
     sched: (n, t, a) => `В ${t} ${n} ${a === 'on' ? 'включится' : 'выключится'}`,
     noTime: 'На какое время? Например: «включи кофеварку в 7 утра»',
@@ -45,8 +45,12 @@ function handle(text) {
   const done = (reply, extra = {}) => ({ reply, lang: p.lang, intent: p.intent, ...extra });
 
   if (p.intent === 'scene') {
-    scenes.run(p.scene);
-    return done(t.scene(scenes.list().find((s) => s.id === p.scene).name[p.lang]));
+    try {
+      scenes.run(p.scene);
+      return done(t.scene(scenes.list().find((s) => s.id === p.scene).name[p.lang]));
+    } catch (err) {
+      return done(p.lang === 'ru' ? 'Не удалось выполнить сценарий: проверьте подключение устройств.' : 'Ssenariy bajarilmadi: qurilmalar ulanishini tekshiring.');
+    }
   }
   if (p.intent === 'energy') {
     const r = energy.report(store.db.samples, cfg.tariff);
@@ -56,6 +60,7 @@ function handle(text) {
 
   const targets = resolve(p);
   if (!targets.length) return done(t.notFound);
+  if (targets.length > 1 && !p.room && p.intent !== 'query') return done(t.clarify);
 
   if (p.intent === 'query') {
     const parts = targets.map((d) => {
@@ -67,14 +72,24 @@ function handle(text) {
   }
   if (p.intent === 'turn_on' || p.intent === 'turn_off') {
     const on = p.intent === 'turn_on';
-    targets.forEach((d) => devices.setPower(d.id, on));
-    return done((on ? t.on : t.off)(label(targets, p.lang)));
+    const offline = targets.filter((d) => !devices.state.get(d.id)?.online);
+    if (offline.length) return done(t.offline(label(offline, p.lang)));
+    try {
+      targets.forEach((d) => devices.setPower(d.id, on));
+      return done((on ? t.on : t.off)(label(targets, p.lang)));
+    } catch (err) {
+      return done(p.lang === 'ru' ? 'Команда не отправлена. Проверьте подключение устройства.' : 'Buyruq yuborilmadi. Qurilma ulanishini tekshiring.');
+    }
   }
   if (p.intent.startsWith('schedule')) {
     if (!p.time) return done(t.noTime);
     const action = p.intent === 'schedule_on' ? 'on' : 'off';
-    scheduler.add({ time: p.time, action, deviceIds: targets.map((d) => d.id) });
-    return done(t.sched(label(targets, p.lang), p.time, action));
+    try {
+      scheduler.add({ time: p.time, action, deviceIds: targets.map((d) => d.id) });
+      return done(t.sched(label(targets, p.lang), p.time, action));
+    } catch (err) {
+      return done(p.lang === 'ru' ? 'Не удалось сохранить расписание. Проверьте время и устройство.' : 'Jadval saqlanmadi. Vaqt va qurilmani tekshiring.');
+    }
   }
   return done(t.unknown);
 }

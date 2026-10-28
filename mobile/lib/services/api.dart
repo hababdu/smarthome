@@ -6,7 +6,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 /// Backend manzili: telefon va server bir Wi-Fi da bo'lsa kompyuter IP si.
 /// Android emulyatorida: http://10.0.2.2:3000
 const String kBaseUrl = String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:3000');
-const String kToken = String.fromEnvironment('API_TOKEN', defaultValue: 'change-me');
+const String kToken = String.fromEnvironment('API_TOKEN', defaultValue: '');
 
 class Device {
   final String id, room, kind;
@@ -42,8 +42,13 @@ class Api {
   Future<Map<String, dynamic>> home() async =>
       jsonDecode((await http.get(_u('/api/home'), headers: _h)).body);
 
-  Future<void> power(String id, bool on) =>
-      http.post(_u('/api/devices/$id/power'), headers: _h, body: jsonEncode({'on': on}));
+  Future<void> power(String id, bool on) async {
+    final response = await http.post(_u('/api/devices/$id/power'), headers: _h, body: jsonEncode({'on': on})).timeout(const Duration(seconds: 10));
+    if (response.statusCode != 202 && response.statusCode != 200) {
+      final message = response.body.isNotEmpty ? response.body : 'HTTP ${response.statusCode}';
+      throw StateError('Qurilma buyrug‘i yuborilmadi: $message');
+    }
+  }
 
   Future<Map<String, dynamic>> energy(String lang) async =>
       jsonDecode((await http.get(_u('/api/energy', {'lang': lang}), headers: _h)).body);
@@ -58,6 +63,16 @@ class Api {
       (await http.post(_u('/api/voice'), headers: _h, body: jsonEncode({'text': text}))).bodyBytes));
 
   /// Real-vaqt yangilanishlar (holat, ogohlantirishlar).
-  WebSocketChannel live() => WebSocketChannel.connect(
-      Uri.parse('${kBaseUrl.replaceFirst('http', 'ws')}/ws?token=$kToken'));
+  Future<WebSocketChannel> live() async {
+    if (kToken.isEmpty) throw StateError('API_TOKEN berilmagan. --dart-define=API_TOKEN=... orqali sozlang.');
+    final response = await http.post(_u('/api/ws-ticket'), headers: _h).timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) throw StateError('WebSocket ticket olinmadi: ${response.statusCode}');
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final ticket = data['ticket'] as String?;
+    if (ticket == null || ticket.isEmpty) throw StateError('Server WebSocket ticket qaytarmadi');
+    final wsBase = kBaseUrl.startsWith('https:')
+        ? kBaseUrl.replaceFirst('https:', 'wss:')
+        : kBaseUrl.replaceFirst('http:', 'ws:');
+    return WebSocketChannel.connect(Uri.parse('$wsBase/ws?ticket=${Uri.encodeQueryComponent(ticket)}'));
+  }
 }

@@ -3,6 +3,7 @@ const assert = require('node:assert');
 const nlu = require('../src/nlu');
 const { checkDevice, shedList } = require('../src/safety');
 const { sampleKwh } = require('../src/energy');
+const scheduler = require('../src/scheduler');
 
 test('NLU: uzbek o\'chirish', () => {
   const r = nlu.parse("Yordamchi, mehmonxonadagi chiroqni o'chir");
@@ -43,4 +44,34 @@ test('Safety: shedList muhimini saqlaydi', () => {
 test('Energy: kWh', () => {
   const s = [{ t: 0, id: 'a', w: 1000 }, { t: 3600000 / 20, id: 'a', w: 1000 }];
   assert.ok(Math.abs(sampleKwh(s, 0, 1e9).a - 0.05) < 1e-6);
+});
+
+
+test('Scheduler: vaqt va amal validatsiyasi', () => {
+  assert.throws(() => scheduler.validateSchedule({ time: '25:70', action: 'on', deviceIds: ['living-light'] }));
+  assert.throws(() => scheduler.validateSchedule({ time: '07:30', action: 'toggle', deviceIds: ['living-light'] }));
+  assert.throws(() => scheduler.validateSchedule({ time: '07:30', action: 'on', deviceIds: ['missing-device'] }));
+  assert.deepStrictEqual(scheduler.validateSchedule({ time: '07:30', action: 'on', deviceIds: ['living-light'], days: [1, 3] }).days, [1, 3]);
+});
+
+test('Energy: katta namuna oralig‘ida sarfni taxmin qilib qo‘shmaydi', () => {
+  const samples = [{ t: 0, id: 'x', w: 1000 }, { t: 20 * 60000, id: 'x', w: 1000 }];
+  assert.strictEqual(sampleKwh(samples, 0, 30 * 60000).x, 0);
+});
+
+test('Energy: vaqt oralig‘i chegarasida to‘g‘ri integratsiya', () => {
+  const samples = [{ t: 0, id: 'x', w: 1000 }, { t: 3 * 60000, id: 'x', w: 1000 }];
+  assert.ok(Math.abs(sampleKwh(samples, 60000, 2 * 60000).x - (1 / 60)) < 1e-6);
+});
+
+
+test('NLU: Russian time-of-day markers', () => {
+  assert.strictEqual(nlu.parse('Включи кофеварку в 7 вечера').time, '19:00');
+  assert.strictEqual(nlu.parse('Включи свет в 7 дня').time, '19:00');
+  assert.strictEqual(nlu.parse('Включи свет в 12 ночи').time, '00:00');
+});
+
+test('Scheduler: duplicate days are normalized', () => {
+  const clean = scheduler.validateSchedule({ time: '08:00', action: 'on', deviceIds: ['living-light'], days: [1, 1, 3] });
+  assert.deepStrictEqual([...new Set(clean.days)], [1, 3]);
 });

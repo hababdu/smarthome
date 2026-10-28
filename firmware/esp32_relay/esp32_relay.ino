@@ -13,6 +13,8 @@ const char* WIFI_SSID = "YOUR_WIFI";
 const char* WIFI_PASS = "YOUR_PASS";
 const char* MQTT_HOST = "192.168.1.10";   // backend kompyuter IP si
 const int   MQTT_PORT = 1883;
+const char* MQTT_USER = "SET_MQTT_USERNAME";
+const char* MQTT_PASS = "SET_MQTT_PASSWORD";
 const char* DEVICE_ID = "kitchen-iron";   // backend store.js dagi id bilan bir xil
 const float RATED_WATTS = 2000;           // shu qurilmaning nominal quvvati
 
@@ -50,8 +52,10 @@ void onMessage(char* topic, byte* payload, unsigned int len) {
 }
 
 void connectMqtt() {
+  // Fail safe: if broker connection is lost, switch the relay off before retrying.
+  if (relayOn) setRelay(false);
   while (!mqtt.connected()) {
-    if (mqtt.connect(DEVICE_ID, nullptr, nullptr, tStatus.c_str(), 1, true, "offline")) {
+    if (mqtt.connect(DEVICE_ID, MQTT_USER, MQTT_PASS, tStatus.c_str(), 1, true, "offline")) {
       mqtt.publish(tStatus.c_str(), "online", true);
       mqtt.subscribe(tCmd.c_str(), 1);
     } else delay(2000);
@@ -68,6 +72,7 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) delay(300);
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
   mqtt.setCallback(onMessage);
+  mqtt.setBufferSize(256);
 }
 
 unsigned long lastPub = 0;

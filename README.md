@@ -1,51 +1,66 @@
-# SmartHome Electric Assistant (MVP)
+# SmartHome Electric Assistant
 
-Uy chiroq/rozetkalarini ovoz (o'zbek/rus) va ilova orqali boshqarish, xavfsizlik monitori, energiya analitikasi, stsenariylar va jadvallar.
+SmartHome boshqaruv paneli (React/Vite), Node.js API, MQTT qurilma qatlami, ESP32 firmware va Flutter mobil ilovasi.
 
-```
-backend/    Node.js: REST + WebSocket + MQTT + NLU + xavfsizlik + energiya
-mobile/     Flutter ilova (Uy, Energiya, Stsenariy, Ovozli yordamchi)
-firmware/   ESP32 reley + tok sensori (Arduino)
-docs/       Arxitektura va UI/UX
-```
+## Muhim xavfsizlik eslatmasi
 
-## Tez ishga tushirish (qurilmasiz — simulyator bilan)
+- Haqiqiy elektr qurilmalarini boshqarishdan oldin apparat himoyasi, rele turi, sensor kalibrovkasi va fail-safe holatini malakali elektrik bilan tekshiring. Dasturiy himoya avtomat/UZO o'rnini bosmaydi.
+- `API_TOKEN` kamida 24 belgili tasodifiy maxfiy qiymat bo'lishi kerak. `change-me` ishlatmang.
+- `VITE_API_TOKEN` Vite orqali brauzer bundle'iga kiritiladi va foydalanuvchilardan yashirin emas. Shu sababli bu tokenli usul faqat ishonchli lokal demo/LAN uchun. Internetga chiqarishdan oldin haqiqiy foydalanuvchi login/session autentifikatsiyasi va rolga asoslangan ruxsatlar qo'shilishi shart.
+- Embedded MQTT broker faqat `127.0.0.1` ga bog'langan. ESP32 boshqa qurilmada bo'lsa, autentifikatsiya va ACL yoqilgan Mosquitto/EMQX kabi alohida broker ishlating; broker portini himoyasiz internetga ochmang.
+- Simulyatsiya standart holatda o‘chiq. Demo uchun `.env` ichida `SIMULATE=true` qiling; haqiqiy qurilmalarda `SIMULATE=false` qoldiring.
+
+## Ishga tushirish (Node.js 22+)
+
+1. `.env.example` nusxasini `.env` nomi bilan yarating.
+2. Tasodifiy token yarating, masalan macOS/Linux terminalida:
+
+   ```bash
+   openssl rand -hex 32
+   ```
+
+3. `.env` faylida `API_TOKEN` va `VITE_API_TOKEN` qiymatlarini aynan bir xil token bilan almashtiring. `GEMINI_API_KEY` faqat audio transkripsiyasi kerak bo'lsa to'ldiriladi.
+4. Bog'liqliklarni o'rnating va ishga tushiring:
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+5. Demo/simulyator kerak bo‘lsa, `.env` ichida `SIMULATE=true` qiling. Haqiqiy apparat uchun `false` qoldiring.
+6. Testlar:
+
+   ```bash
+   npm test
+   ```
+
+## API misollari
+
+Tokenni terminaldagi muhit o'zgaruvchisidan oling; tokenni GitHub yoki frontend kodiga yozmang.
 
 ```bash
-cd backend
-cp .env.example .env        # API_TOKEN ni o'zgartiring
-npm install
-export TZ=Asia/Tashkent     # jadval to'g'ri vaqtda ishlashi uchun
-npm start                   # API :3000, MQTT :1883, simulyator yoqilgan
-npm test                    # NLU, xavfsizlik, energiya testlari
-npm run demo                # kutubxonasiz demo (npm install shart emas)
+curl -H "Authorization: Bearer $API_TOKEN" http://localhost:3000/health
+curl -H "Authorization: Bearer $API_TOKEN" http://localhost:3000/api/home
 ```
 
-Tekshirish:
-```bash
-curl -H "Authorization: Bearer change-me" localhost:3000/api/home
-curl -X POST -H "Authorization: Bearer change-me" -H "Content-Type: application/json" \
-  -d '{"text":"Mehmonxonadagi chiroqni yoq"}' localhost:3000/api/voice
-```
+`/health` faqat servis holatini bildiradi; u qurilmalar ishlayotganini kafolatlamaydi.
 
-## Mobil ilova
+## Flutter
+
+Android emulyatorida backend manzili `http://10.0.2.2:3000`; haqiqiy telefonda server kompyuterining lokal IP manzilidan foydalaning. Flutter build/run vaqtida `API_TOKEN` va `API_URL` `--dart-define` orqali beriladi:
 
 ```bash
-cd mobile
-flutter create . --project-name smarthome_assistant   # android/ios papkalarini yaratadi
-flutter pub get
-flutter run --dart-define=API_URL=http://<KOMPYUTER_IP>:3000 --dart-define=API_TOKEN=change-me
+flutter run --dart-define=API_URL=http://10.0.2.2:3000 --dart-define=API_TOKEN=YOUR_LONG_TOKEN
 ```
-- Android: `android/app/src/main/AndroidManifest.xml` ga `<uses-permission android:name="android.permission.RECORD_AUDIO"/>`, `INTERNET` va `<application android:usesCleartextTraffic="true">` (faqat lokal tarmoq uchun) qo'shing.
-- iOS: `Info.plist` ga `NSMicrophoneUsageDescription` va `NSSpeechRecognitionUsageDescription`.
-- O'zbek tilida nutqni tanish/aytish qurilmaga bog'liq; bo'lmasa rus tiliga o'tadi yoki matn maydonidan foydalaning.
 
-## Haqiqiy qurilmalar
-`firmware/esp32_relay/esp32_relay.ino` ni yuklang (`DEVICE_ID` ni `backend/src/store.js` dagi id ga moslang), `.env` da `SIMULATE=false` qiling.
-Qurilmalarni `store.js` (keyin `data.json`) da o'zgartiring.
+Bu tokenni mobil ilova ichidan ham chiqarib olish mumkin; internetga mo'ljallangan release uchun per-user autentifikatsiya zarur.
 
-## Muhim eslatmalar
-- Qisqa tutashuv/ortiqcha yuklamadan **asosiy himoya apparat bo'lishi shart** (avtomat, UZO). Dasturiy o'chirish qo'shimcha qatlam.
-- 220V bilan ishlashni malakali elektrikka topshiring.
-- Tarif `TARIFF_UZS_PER_KWH` da — haqiqiy tarifingizga moslang.
-- Kod hozircha yig'ib sinab ko'rilmagan qismlar: Flutter ilova (`flutter analyze` ishlatib ko'ring) va ESP32 firmware; backend mantig'i testlardan o'tgan.
+## MQTT
+
+- Local demo: embedded broker `127.0.0.1:1883`.
+- ESP32 bilan: `MQTT_URL`, `MQTT_USERNAME`, `MQTT_PASSWORD` orqali autentifikatsiyalangan broker sozlang. Broker ACL har bir qurilmaga faqat o'zining `home/<id>/cmd`, `state` va `status` mavzulariga kerakli ruxsatni berishi kerak.
+- ESP32 firmware'dagi Wi-Fi, broker va qurilma sozlamalarini real muhitga moslang.
+
+## Test qamrovi
+
+Unit testlar asosiy NLU, xavfsizlik va energiya integratsiyasini tekshiradi. Ular API autentifikatsiyasi, haqiqiy MQTT broker, ESP32 apparati yoki elektr xavfsizligini to'liq tasdiqlamaydi; bu yo'nalishlar alohida integratsion va laboratoriya sinovlarini talab qiladi.

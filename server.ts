@@ -3,6 +3,7 @@ import path from 'node:path';
 import express, { Request, Response, NextFunction } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createRequire } from 'node:module';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { GoogleGenAI } from '@google/genai';
 
 const require = createRequire(import.meta.url);
@@ -16,15 +17,12 @@ const energy = require('./backend/src/energy.js');
 const voice = require('./backend/src/voice.js');
 const simulator = require('./backend/src/simulator.js');
 
-// Initialize Gemini SDK with User-Agent telemetry
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
+// Create the external AI client lazily so the server can run without an AI key.
+const getAi = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY sozlanmagan');
+  return new GoogleGenAI({ apiKey, httpOptions: { headers: { 'User-Agent': 'smarthome-assistant' } } });
+};
 
 // Load database store
 store.db;
@@ -33,37 +31,64 @@ store.db;
 broker.startBroker();
 
 const app = express();
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.disable('x-powered-by');
+app.use(express.json({ limit: '2mb', strict: true }));
+app.use(express.urlencoded({ extended: true, limit: '64kb', parameterLimit: 100 }));
 
-// Auth middleware: support Bearer token or same-origin web app
-const auth = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) {
-    // Web UI internal calls
-    return next();
-  }
-  const tok = authHeader.replace('Bearer ', '').trim();
-  if (tok === cfg.apiToken || tok === 'change-me' || !cfg.apiToken) {
-    return next();
-  }
-  return res.status(401).json({ error: 'unauthorized' });
+// This API-token scheme is suitable only for a trusted LAN/demo. A production
+// deployment should replace it with per-user authentication and authorization.
+const safeTokenEqual = (provided: string, expected: string) => {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 };
+const auth = (req: Request, res: Response, next: NextFunction) => {
+  if (!cfg.apiToken) return res.status(503).json({ error: 'server_auth_not_configured' });
+  const match = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
+  if (!match || !safeTokenEqual(match[1].trim(), cfg.apiToken)) return res.status(401).json({ error: 'unauthorized' });
+  next();
+};
+
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+const rateLimit = (limit: number, windowMs: number) => (req: Request, res: Response, next: NextFunction) => {
+  const now = Date.now();
+  const key = `${req.ip}:${req.path}`;
+  let bucket = rateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) { bucket = { count: 0, resetAt: now + windowMs }; rateBuckets.set(key, bucket); }
+  bucket.count += 1;
+  res.setHeader('RateLimit-Limit', String(limit));
+  res.setHeader('RateLimit-Remaining', String(Math.max(0, limit - bucket.count)));
+  if (bucket.count > limit) return res.status(429).json({ error: 'rate_limit_exceeded' });
+  next();
+};
+
+// Short-lived one-time tickets avoid putting the long-lived API token in the WS URL.
+const wsTickets = new Map<string, number>();
+setInterval(() => { const now = Date.now(); for (const [ticket, expires] of wsTickets) if (expires <= now) wsTickets.delete(ticket); }, 30000).unref();
 
 // Health endpoint
 app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
 
 // API router
+app.post('/api/ws-ticket', auth, (_req, res) => {
+  const ticket = randomBytes(32).toString('hex');
+  wsTickets.set(ticket, Date.now() + 30000);
+  res.json({ ticket, expiresIn: 30 });
+});
+
 app.get('/api/home', auth, (_req, res) => {
   res.json(devices.snapshot());
 });
 
-app.post('/api/devices/:id/power', auth, (req, res) => {
+app.post('/api/devices/:id/power', auth, rateLimit(30, 60000), (req, res) => {
+  if (typeof req.body?.on !== 'boolean') return res.status(400).json({ error: 'on_must_be_boolean' });
   try {
-    devices.setPower(req.params.id, !!req.body.on);
-    res.json({ ok: true, state: devices.snapshot() });
+    const result = devices.setPower(req.params.id, req.body.on);
+    res.status(202).json({ ...result, state: devices.snapshot() });
   } catch (e: any) {
-    res.status(404).json({ error: e.message });
+    const message = String(e?.message || 'device_command_failed');
+    const status = message.startsWith('unknown device') ? 404 : 409;
+    res.status(status).json({ error: message });
   }
 });
 
@@ -82,7 +107,8 @@ app.post('/api/scenes/:id/run', auth, (req, res) => {
     scenes.run(req.params.id);
     res.json({ ok: true, message: `Scene ${req.params.id} executed` });
   } catch (e: any) {
-    res.status(404).json({ error: e.message });
+    const message = String(e?.message || 'scene_failed');
+    res.status(message === 'unknown scene' ? 404 : 409).json({ error: message });
   }
 });
 
@@ -108,29 +134,35 @@ app.delete('/api/schedules/:id', auth, (req, res) => {
   }
 });
 
-app.post('/api/voice', auth, (req, res) => {
-  const text = String(req.body.text || '').slice(0, 300);
+app.post('/api/voice', auth, rateLimit(60, 60000), (req, res) => {
+  if (typeof req.body?.text !== 'string' || !req.body.text.trim()) return res.status(400).json({ error: 'text_required' });
+  const text = req.body.text.trim().slice(0, 300);
   res.json(voice.handle(text));
 });
 
 // Audio transcription endpoint using gemini-3.5-transcribe
-app.post('/api/transcribe', auth, async (req: Request, res: Response) => {
+app.post('/api/transcribe', auth, rateLimit(10, 60000), async (req: Request, res: Response) => {
   try {
-    const { audioBase64, mimeType } = req.body;
-    if (!audioBase64) {
+    const { audioBase64, mimeType } = req.body || {};
+    if (typeof audioBase64 !== 'string' || !audioBase64) {
       return res.status(400).json({ error: 'Audio ma\'lumoti topilmadi (audioBase64 talab qilinadi)' });
     }
 
     // Clean base64 if it has data URL prefix
-    const cleanBase64 = String(audioBase64).replace(/^data:audio\/[a-z0-9\-]+;base64,/, '');
-
+    const cleanBase64 = audioBase64.replace(/^data:audio\/[a-z0-9.+-]+;base64,/i, '');
+    if (cleanBase64.length > 1500000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64)) {
+      return res.status(400).json({ error: 'audio_payload_invalid_or_too_large' });
+    }
+    const allowedMimeTypes = new Set(['audio/webm', 'audio/ogg', 'audio/wav', 'audio/mpeg', 'audio/mp4']);
+    const safeMimeType = typeof mimeType === 'string' && allowedMimeTypes.has(mimeType) ? mimeType : 'audio/webm';
+    const ai = getAi();
     const response = await ai.models.generateContent({
       model: 'gemini-3.5-transcribe',
       contents: {
         parts: [
           {
             inlineData: {
-              mimeType: mimeType || 'audio/webm',
+              mimeType: safeMimeType,
               data: cleanBase64,
             },
           },
@@ -149,17 +181,20 @@ app.post('/api/transcribe', auth, async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('[Gemini Transcribe Error]:', err);
-    return res.status(500).json({
-      error: err.message || 'Audio transkripsiyasida xatolik yuz berdi',
+    return res.status(502).json({
+      error: 'Audio transkripsiyasi xizmati vaqtincha ishlamayapti',
     });
   }
 });
 
 // Simulator & testing endpoints
-app.post('/api/simulator/spike', auth, (req, res) => {
-  const { id, watts } = req.body;
-  const targetId = id || 'kitchen-iron';
-  const targetWatts = Number(watts) || 6500;
+app.post('/api/simulator/spike', auth, rateLimit(5, 60000), (req, res) => {
+  if (!cfg.simulate) return res.status(403).json({ error: 'simulator_disabled' });
+  const { id, watts } = req.body || {};
+  const targetId = typeof id === 'string' ? id : 'kitchen-iron';
+  const targetWatts = Number(watts);
+  if (!store.db.devices.some((d: any) => d.id === targetId)) return res.status(404).json({ error: 'unknown_device' });
+  if (!Number.isFinite(targetWatts) || targetWatts <= 0 || targetWatts > 100000) return res.status(400).json({ error: 'invalid_watts' });
   simulator.spike(targetId, targetWatts);
   res.json({ ok: true, message: `Spike injected on ${targetId}: ${targetWatts}W` });
 });
@@ -174,8 +209,8 @@ app.get('/api/simulator/status', auth, (_req, res) => {
 });
 
 app.post('/api/tariff', auth, (req, res) => {
-  const newTariff = Number(req.body.tariff);
-  if (newTariff > 0) {
+  const newTariff = Number(req.body?.tariff);
+  if (Number.isFinite(newTariff) && newTariff > 0 && newTariff <= 100000000) {
     cfg.tariff = newTariff;
     return res.json({ ok: true, tariff: cfg.tariff });
   }
@@ -207,14 +242,14 @@ const broadcast = (msg: any) => {
 
 wss.on('connection', (ws, req) => {
   try {
-    const tok = new URL(req.url || '', 'http://localhost').searchParams.get('token');
-    if (tok && tok !== cfg.apiToken && tok !== 'change-me') {
-      return ws.close(4401, 'unauthorized');
-    }
-    // Send snapshot immediately on connect
+    const ticket = new URL(req.url || '', 'http://localhost').searchParams.get('ticket') || '';
+    const expires = wsTickets.get(ticket);
+    if (!ticket || !expires || expires <= Date.now()) return ws.close(4401, 'unauthorized');
+    wsTickets.delete(ticket); // one-time use
     ws.send(JSON.stringify({ type: 'snapshot', ...devices.snapshot() }));
   } catch (err) {
-    console.error('WebSocket connection error:', err);
+    console.error('[ws] connection error:', err);
+    ws.close(1011, 'connection error');
   }
 });
 
@@ -243,6 +278,9 @@ const cliHost = hostArgIndex !== -1 ? process.argv[hostArgIndex + 1] : undefined
 const HOST = cliHost || process.env.HOST || '0.0.0.0';
 
 async function startServer() {
+  if (!cfg.apiToken || cfg.apiToken.length < 24) {
+    throw new Error('API_TOKEN majburiy va kamida 24 belgidan iborat bo‘lishi kerak. .env.example faylini ko‘ring.');
+  }
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -265,9 +303,11 @@ async function startServer() {
 // Graceful cleanup on restart
 const cleanExit = () => {
   try {
+    scheduler.stop();
+    store.flush();
     server.close();
     wss.close();
-  } catch (_) {}
+  } catch (err) { console.error('[shutdown] cleanup error:', err); }
   process.exit(0);
 };
 

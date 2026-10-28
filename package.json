@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "node --env-file-if-exists=.env --import tsx server.ts",
     "build": "vite build",
-    "start": "tsx server.ts",
-    "test": "node --test backend/test/core.test.js"
+    "start": "node --env-file-if-exists=.env --import tsx server.ts",
+    "test": "node --test backend/test/*.test.js"
   },
   "dependencies": {
     "@google/genai": "^2.31.0",

@@ -23,6 +23,7 @@ export interface Device {
   on: boolean;
   watts: number;
   online: boolean;
+  pendingPower?: boolean | null;
   ts?: number;
 }
 

@@ -1,7 +1,8 @@
-// Oddiy JSON-fayl asosidagi saqlash (MVP). Keyin PostgreSQL/SQLite ga almashtirish mumkin.
+// JSON persistence for MVP. Use SQLite/PostgreSQL for multi-process production deployments.
 const fs = require('fs');
 const path = require('path');
 const FILE = path.join(__dirname, '..', 'data.json');
+const TEMP_FILE = `${FILE}.tmp`;
 
 const defaults = {
   rooms: [
@@ -9,7 +10,6 @@ const defaults = {
     { id: 'bedroom', name: { uz: 'Yotoqxona', ru: 'Спальня' } },
     { id: 'kitchen', name: { uz: 'Oshxona', ru: 'Кухня' } },
   ],
-  // priority: 1 = muhim (o'chirilmaydi), 3 = ortiqcha yuklamada birinchi o'chiriladi
   devices: [
     { id: 'living-light', room: 'living', kind: 'light', name: { uz: 'chiroq', ru: 'свет' }, ratedWatts: 60, priority: 2 },
     { id: 'living-tv', room: 'living', kind: 'tv', name: { uz: 'televizor', ru: 'телевизор' }, ratedWatts: 150, priority: 3 },
@@ -20,18 +20,35 @@ const defaults = {
     { id: 'kitchen-fridge', room: 'kitchen', kind: 'fridge', name: { uz: 'muzlatkich', ru: 'холодильник' }, ratedWatts: 150, priority: 1, essential: true },
   ],
   schedules: [],
-  samples: [], // { t, id, w }
+  samples: [],
 };
 
 let db;
 function load() {
-  try { db = JSON.parse(fs.readFileSync(FILE, 'utf8')); }
-  catch { db = JSON.parse(JSON.stringify(defaults)); }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+    if (!parsed || !Array.isArray(parsed.devices) || !Array.isArray(parsed.rooms) || !Array.isArray(parsed.schedules) || !Array.isArray(parsed.samples)) throw new Error('invalid database shape');
+    db = parsed;
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.error('[store] data.json o‘qilmadi, boshlang‘ich ma’lumotlar ishlatiladi:', err.message);
+    db = JSON.parse(JSON.stringify(defaults));
+  }
   return db;
 }
 let timer;
+function flush() {
+  clearTimeout(timer);
+  timer = null;
+  try {
+    fs.writeFileSync(TEMP_FILE, JSON.stringify(db), { mode: 0o600 });
+    fs.renameSync(TEMP_FILE, FILE);
+  } catch (err) {
+    console.error('[store] saqlashda xato:', err.message);
+    throw err;
+  }
+}
 function save() {
   clearTimeout(timer);
-  timer = setTimeout(() => fs.writeFileSync(FILE, JSON.stringify(db)), 500);
+  timer = setTimeout(() => { try { flush(); } catch {} }, 250);
 }
-module.exports = { get db() { return db || load(); }, save };
+module.exports = { get db() { return db || load(); }, save, flush };

@@ -1,6 +1,8 @@
 import { HomeSnapshot, EnergyReport, Scene, Schedule, VoiceResponse } from '../types';
 
-const API_TOKEN = 'change-me';
+const API_TOKEN = import.meta.env.VITE_API_TOKEN || '';
+
+if (!API_TOKEN) console.warn('VITE_API_TOKEN sozlanmagan. API so‘rovlari autentifikatsiyadan o‘tmaydi.');
 
 const headers = {
   'Content-Type': 'application/json',
@@ -115,36 +117,39 @@ export function createWebSocket(
   onStatusChange?: (connected: boolean) => void
 ): () => void {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const url = `${protocol}//${window.location.host}/ws?token=${API_TOKEN}`;
   let ws: WebSocket | null = null;
   let retryTimer: any = null;
   let isClosedExplicitly = false;
 
   function connect() {
     if (isClosedExplicitly) return;
+    if (!API_TOKEN) { onStatusChange?.(false); console.error('VITE_API_TOKEN sozlanmagan'); return; }
     try {
-      ws = new WebSocket(url);
-      ws.onopen = () => {
-        onStatusChange?.(true);
-      };
-      ws.onmessage = (event) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          onMessage(parsed);
-        } catch (e) {
-          console.error('Failed to parse WS message:', e);
-        }
-      };
-      ws.onclose = () => {
-        onStatusChange?.(false);
-        if (!isClosedExplicitly) {
-          retryTimer = setTimeout(connect, 3000);
-        }
-      };
-      ws.onerror = (err) => {
-        console.warn('WebSocket error, reconnecting...', err);
-        ws?.close();
-      };
+      fetch('/api/ws-ticket', { method: 'POST', headers })
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`WS ticket olish muvaffaqiyatsiz: ${res.status}`);
+          return res.json();
+        })
+        .then(({ ticket }: { ticket: string }) => {
+          if (isClosedExplicitly) return;
+          const url = `${protocol}//${window.location.host}/ws?ticket=${encodeURIComponent(ticket)}`;
+          ws = new WebSocket(url);
+          ws.onopen = () => onStatusChange?.(true);
+          ws.onmessage = (event) => {
+            try { onMessage(JSON.parse(event.data)); }
+            catch (e) { console.error('Failed to parse WS message:', e); }
+          };
+          ws.onclose = () => {
+            onStatusChange?.(false);
+            if (!isClosedExplicitly) retryTimer = setTimeout(connect, 3000);
+          };
+          ws.onerror = (err) => { console.warn('WebSocket error, reconnecting...', err); ws?.close(); };
+        })
+        .catch((e) => {
+          console.warn('WebSocket ticket olishda xato:', e);
+          if (!isClosedExplicitly) retryTimer = setTimeout(connect, 5000);
+        });
+      return;
     } catch (e) {
       console.warn('Failed to connect WebSocket:', e);
       retryTimer = setTimeout(connect, 3000);

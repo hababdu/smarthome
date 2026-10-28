@@ -35,13 +35,14 @@ const findKey = (t, map) => Object.keys(map).find((k) => has(t, map[k])) || null
 const detectLang = (raw) => (/[а-яё]/i.test(raw) ? 'ru' : 'uz');
 
 function parseTime(t) {
-  // "soat 7 da", "soat 7:30", "в 7 утра", "в 19:00"
+  // Supports: soat 7 da, soat 7:30, в 7 утра, в 7 вечера, в 19:00.
   const m = t.match(/(?:soat|в)\s*(\d{1,2})(?:[:.](\d{2}))?/);
   if (!m) return null;
-  let h = +m[1];
-  const min = m[2] ? +m[2] : 0;
-  if (/вечера/.test(t) && h < 12) h += 12;
+  let h = Number(m[1]);
+  const min = m[2] === undefined ? 0 : Number(m[2]);
   if (h > 23 || min > 59) return null;
+  if (/вечера|дня|kechqurun|kunduzi/.test(t) && h < 12) h += 12;
+  if (/ночи/.test(t) && h === 12) h = 0;
   return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
@@ -55,7 +56,7 @@ function parse(raw) {
   out.room = findKey(t, ROOMS);
   out.device = findKey(t, DEVICES);
 
-  const isQuery = has(t, QUERY) || /\bли\b/.test(t);
+  const isQuery = has(t, QUERY) || /\bли\b/.test(t) || /\bmi\b/.test(t);
   const wantsOff = has(t, OFF);
   // "yoqilganmi" so'zi "yoq" ni ham o'z ichiga oladi — shuning uchun so'rovni oldin tekshiramiz
   if (isQuery) return { ...out, intent: 'query' };

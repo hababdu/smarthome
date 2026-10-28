@@ -1,18 +1,31 @@
 const DAY = 86400000;
+const MAX_SAMPLE_GAP_MS = 5 * 60000;
 
-/** Namunalardan (t, id, w) qurilma bo'yicha kWh hisoblaydi. */
+/** Integrate measured power. Long gaps are skipped rather than inventing consumption. */
 function sampleKwh(samples, from, to) {
   const by = {};
   for (const s of samples) {
-    if (s.t >= from && s.t <= to) (by[s.id] ||= []).push(s);
+    if (!s || typeof s.id !== 'string' || !Number.isFinite(s.t) || !Number.isFinite(s.w) || s.w < 0) continue;
+    (by[s.id] ||= []).push(s);
   }
   const per = {};
   for (const [id, arr] of Object.entries(by)) {
     arr.sort((a, b) => a.t - b.t);
     let wh = 0;
     for (let i = 0; i < arr.length - 1; i++) {
-      const dt = Math.min(arr[i + 1].t - arr[i].t, 5 * 60000); // katta bo'shliqlarni kesamiz
-      wh += (arr[i].w * dt) / 3600000;
+      const a = arr[i];
+      const b = arr[i + 1];
+      const dt = b.t - a.t;
+      if (dt <= 0 || dt > MAX_SAMPLE_GAP_MS) continue;
+      const start = Math.max(a.t, from);
+      const end = Math.min(b.t, to);
+      if (end <= start) continue;
+      // Linear interpolation at the window edges; trapezoidal integration between samples.
+      const ratioStart = (start - a.t) / dt;
+      const ratioEnd = (end - a.t) / dt;
+      const wStart = a.w + (b.w - a.w) * ratioStart;
+      const wEnd = a.w + (b.w - a.w) * ratioEnd;
+      wh += ((wStart + wEnd) / 2) * (end - start) / 3600000;
     }
     per[id] = wh / 1000;
   }
@@ -44,4 +57,4 @@ function tips(rep, devices, lang = 'uz') {
   return out;
 }
 
-module.exports = { report, tips, sampleKwh };
+module.exports = { report, tips, sampleKwh, MAX_SAMPLE_GAP_MS };

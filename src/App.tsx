@@ -77,6 +77,11 @@ export function App() {
             setTotalWatts(Math.round(newTotal));
             return updated;
           });
+        } else if (data.type === 'command_status') {
+          setDevices((prev) => prev.map((d) => d.id === data.id ? { ...d, ...(data.state || {}), pendingPower: null } : d));
+          if (data.status === 'timeout' || data.status === 'publish_failed' || data.status === 'device_offline') {
+            setToastMessage(lang === 'uz' ? 'Qurilma buyrug‘ini tasdiqlamadi. Ulanishni tekshiring.' : 'Устройство не подтвердило команду. Проверьте соединение.');
+          }
         } else if (data.type === 'alert') {
           setAlert({
             message: data.message,
@@ -98,80 +103,29 @@ export function App() {
     // Trigger subtle tactile haptic feedback on device switch
     triggerHaptic('toggle');
 
-    // Optimistic local update
-    setDevices((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, on: nextState, watts: nextState ? d.ratedWatts : 0 } : d))
-    );
     try {
       await setDevicePower(id, nextState);
+      setToastMessage(lang === 'uz' ? 'Buyruq yuborildi, qurilma tasdig‘i kutilmoqda.' : 'Команда отправлена, ожидается подтверждение устройства.');
     } catch (e) {
       console.error(e);
-      loadInitialData(); // Rollback if error
+      setToastMessage(lang === 'uz' ? 'Buyruq yuborilmadi. Qurilma va MQTT ulanishini tekshiring.' : 'Команда не отправлена. Проверьте устройство и MQTT.');
+      await loadInitialData();
     }
   };
 
   const handleRunQuickAction = async (actionKey: string) => {
-    // Trigger crisp double-pulse haptic feedback on quick action execution
     triggerHaptic('quickAction');
-
     try {
-      if (actionKey === 'all_off') {
-        // Turn off all except essential fridge
-        setDevices((prev) =>
-          prev.map((d) => (d.essential ? d : { ...d, on: false, watts: 0 }))
-        );
-        await runScene('all_off');
-        setToastMessage(
-          lang === 'uz'
-            ? "Barcha qurilmalar o'chirildi (muzlatkich qoldi)"
-            : 'Все устройства отключены (кроме холодильника)'
-        );
-      } else if (actionKey === 'evening') {
-        setDevices((prev) =>
-          prev.map((d) => {
-            if (d.id === 'living-light' || d.id === 'living-tv' || d.id === 'kitchen-light') {
-              return { ...d, on: true, watts: d.ratedWatts };
-            }
-            if (d.essential) return d;
-            return { ...d, on: false, watts: 0 };
-          })
-        );
-        await runScene('evening');
-        setToastMessage(
-          lang === 'uz' ? '«Oqshom rejimi» faollashtirildi' : 'Вечерний режим активирован'
-        );
-      } else if (actionKey === 'good_night') {
-        setDevices((prev) =>
-          prev.map((d) => {
-            if (d.id === 'bedroom-light') return { ...d, on: true, watts: d.ratedWatts };
-            if (d.essential) return d;
-            return { ...d, on: false, watts: 0 };
-          })
-        );
-        await runScene('good_night');
-        setToastMessage(
-          lang === 'uz' ? '«Xayrli tun» rejimi faollashtirildi' : 'Режим «Спокойной ночи» активирован'
-        );
-      } else if (actionKey === 'morning') {
-        setDevices((prev) =>
-          prev.map((d) => {
-            if (d.id === 'kitchen-light' || d.id === 'kitchen-coffee' || d.id === 'bedroom-light') {
-              return { ...d, on: true, watts: d.ratedWatts };
-            }
-            if (d.essential) return d;
-            return { ...d, on: false, watts: 0 };
-          })
-        );
-        await runScene('morning');
-        setToastMessage(
-          lang === 'uz' ? '«Ertalab» rejimi faollashtirildi' : 'Утренний режим активирован'
-        );
-      } else {
-        await runScene(actionKey);
-      }
-      setTimeout(() => setToastMessage(null), 3000);
-    } catch (err: any) {
+      await runScene(actionKey);
+      setToastMessage(lang === 'uz'
+        ? 'Ssenariy buyruqlari yuborildi. Qurilmalar tasdig‘i kutilmoqda.'
+        : 'Команды сценария отправлены. Ожидается подтверждение устройств.');
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err) {
       console.error('Quick action failed:', err);
+      setToastMessage(lang === 'uz'
+        ? 'Ssenariy to‘liq bajarilmadi. Qurilmalar ulanishini tekshiring.'
+        : 'Сценарий выполнен не полностью. Проверьте подключение устройств.');
     }
   };
 

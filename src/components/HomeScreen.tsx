@@ -508,7 +508,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {roomDevices.map((device) => {
                   const isEssential = !!device.essential;
                   const isOnline = device.online;
-                  const canToggle = isOnline && !isEssential;
+                  const isPending = device.pendingPower !== undefined && device.pendingPower !== null;
+                  const canToggle = isOnline && !isEssential && !isPending;
 
                   // Dynamic color matching Apple Control Center
                   const activeColorClass =
@@ -563,6 +564,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                           <div className="text-[11px] text-white/50 truncate leading-tight mt-0.5 font-mono">
                             {!isOnline ? (
                               <span>{lang === 'uz' ? 'Tarmoqda emas' : 'Не в сети'}</span>
+                            ) : isPending ? (
+                              <span className="text-amber-300">{lang === 'uz' ? 'Tasdiq kutilmoqda…' : 'Ожидается подтверждение…'}</span>
                             ) : device.on ? (
                               <span className="text-[#0A84FF] font-medium">{Math.round(device.watts)} W</span>
                             ) : (
