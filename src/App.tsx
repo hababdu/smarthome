@@ -22,6 +22,15 @@ import { triggerHaptic } from './utils/haptics';
 export function App() {
   const [tab, setTab] = useState<number>(0);
   const [lang, setLang] = useState<Language>('uz');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try { return localStorage.getItem('smarthome-theme') === 'light' ? 'light' : 'dark'; }
+    catch { return 'dark'; }
+  });
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try { localStorage.setItem('smarthome-theme', theme); } catch { /* Storage may be unavailable. */ }
+  }, [theme]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [totalWatts, setTotalWatts] = useState<number>(0);
@@ -137,7 +146,7 @@ export function App() {
   ];
 
   return (
-    <div className="min-h-screen text-white flex flex-col font-sans selection:bg-[#0A84FF]">
+    <div data-theme={theme} className="app-shell min-h-screen flex flex-col font-sans selection:bg-[#8B5CF6]">
       {/* Top Header */}
       <Header
         totalWatts={totalWatts}
@@ -146,6 +155,8 @@ export function App() {
         alert={alert}
         lang={lang}
         onLanguageChange={setLang}
+        theme={theme}
+        onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
         onOpenSimulator={() => setIsSimulatorOpen(true)}
         onOpen3DView={() => setIs3DOpen(true)}
       />
@@ -159,7 +170,7 @@ export function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-md w-full mx-auto px-3.5 pt-4 pb-28">
+      <main className="app-content flex-1 w-full mx-auto px-3.5 sm:px-5 lg:px-8 pt-4 lg:pt-7 pb-28">
         {loading && devices.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-white/50 gap-3">
             <div className="w-9 h-9 border-2 border-[#0A84FF] border-t-transparent rounded-full animate-spin" />
@@ -191,7 +202,7 @@ export function App() {
       </main>
 
       {/* Floating Apple Glass Bottom Navigation Dock */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-sm control-center-panel rounded-full px-3 py-1.5 shadow-2xl flex items-center justify-between">
+      <div className="app-bottom-nav fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-sm control-center-panel rounded-full px-3 py-1.5 shadow-2xl flex items-center justify-between">
         {/* Tab 0: Home */}
         <button
           onClick={() => setTab(0)}
