@@ -17,6 +17,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Secret'larni tekshirish
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+        run: |
+          if [ -z "$API_URL" ] || [ -z "$API_TOKEN" ]; then
+            echo "::error::API_URL yoki API_TOKEN secret'i kiritilmagan. Settings -> Secrets and variables -> Actions bo'limida qo'shing."
+            exit 1
+          fi
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
