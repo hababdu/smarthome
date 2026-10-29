@@ -14,8 +14,8 @@ jobs:
 
       - name: Secret'larni tekshirish
         env:
-          API_URL: ${{ secrets.API_URL }}
-          API_TOKEN: ${{ secrets.API_TOKEN }}
+          API_URL: ${{ secrets.API_URL || vars.API_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN || vars.API_TOKEN }}
         run: |
           if [ -z "$API_URL" ] || [ -z "$API_TOKEN" ]; then
             echo "::error::API_URL yoki API_TOKEN secret'i kiritilmagan. Settings -> Secrets and variables -> Actions bo'limida qo'shing."
@@ -53,8 +53,8 @@ jobs:
 
       - name: Imzosiz iOS build
         env:
-          API_URL: ${{ secrets.API_URL }}
-          API_TOKEN: ${{ secrets.API_TOKEN }}
+          API_URL: ${{ secrets.API_URL || vars.API_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN || vars.API_TOKEN }}
         run: |
           flutter build ios --release --no-codesign \
             --dart-define=API_URL="$API_URL" \
