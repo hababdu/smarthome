@@ -1,0 +1,17 @@
+{
+  "name": "SmartHome Premium",
+  "colors": {
+    "background": "#151719",
+    "surface": "#222528",
+    "surfaceRaised": "#2B2E31",
+    "textPrimary": "#F7F7F5",
+    "textSecondary": "#A6AAAE",
+    "accent": "#FF9B45",
+    "accentDeep": "#F07B2D",
+    "success": "#8BCB9A",
+    "divider": "#3A3D40"
+  },
+  "typography": {"family": "Inter", "sizes": {"caption": 10, "body": 14, "subtitle": 16, "heading": 24, "display": 32}},
+  "radius": {"small": 10, "medium": 14, "large": 18, "pill": 999},
+  "spacing": [4, 8, 12, 16, 24, 32, 48]
+}

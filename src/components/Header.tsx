@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
             title={lang === 'uz' ? '3D Uy Modeli' : '3D Модель Дома'}
             className="app-icon-button flex items-center justify-center w-8 h-8 rounded-xl transition cursor-pointer"
           >
-            <Box className="w-3.5 h-3.5 text-[#0A84FF]" />
+            <Box className="w-3.5 h-3.5 text-[#F07837]" />
           </button>
 
           {/* Simulator Button */}
@@ -101,7 +101,7 @@ export const Header: React.FC<HeaderProps> = ({
             title={lang === 'uz' ? 'Xavfsizlik testi' : 'Тест безопасности'}
             className="app-icon-button flex items-center justify-center w-8 h-8 rounded-xl transition cursor-pointer"
           >
-            <Cpu className="w-3.5 h-3.5 text-[#64D2FF]" />
+            <Cpu className="w-3.5 h-3.5 text-[#FFAD5C]" />
           </button>
 
           <button

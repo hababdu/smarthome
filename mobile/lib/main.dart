@@ -48,7 +48,7 @@ class _SmartHomeAppState extends State<SmartHomeApp> {
   }
 
   ThemeData _buildTheme(Brightness brightness) {
-    const accent = Color(0xFF8B5CF6);
+    const accent = Color(0xFFF07837);
     final isDark = brightness == Brightness.dark;
     final scheme = ColorScheme.fromSeed(
       seedColor: accent,

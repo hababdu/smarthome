@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Header } from './components/Header';
 import { HomeScreen } from './components/HomeScreen';
+import { DeviceDetailScreen } from './components/DeviceDetailScreen';
 import { EnergyScreen } from './components/EnergyScreen';
 import { ScenesScreen } from './components/ScenesScreen';
 import { SchedulesScreen } from './components/SchedulesScreen';
@@ -21,6 +22,7 @@ import { triggerHaptic } from './utils/haptics';
 
 export function App() {
   const [tab, setTab] = useState<number>(0);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [lang, setLang] = useState<Language>('uz');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return localStorage.getItem('smarthome-theme') === 'light' ? 'light' : 'dark'; }
@@ -163,7 +165,7 @@ export function App() {
 
       {/* Floating Action Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 control-tile bg-[#0A84FF] text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 control-tile bg-[#F07837] text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200">
           <CheckCircle2 className="w-4 h-4 text-white" />
           <span>{toastMessage}</span>
         </div>
@@ -173,14 +175,17 @@ export function App() {
       <main className="app-content flex-1 w-full mx-auto px-3.5 sm:px-5 lg:px-8 pt-4 lg:pt-7 pb-28">
         {loading && devices.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-white/50 gap-3">
-            <div className="w-9 h-9 border-2 border-[#0A84FF] border-t-transparent rounded-full animate-spin" />
+            <div className="w-9 h-9 border-2 border-[#F07837] border-t-transparent rounded-full animate-spin" />
             <p className="text-xs font-medium">
               {lang === 'uz' ? 'SmartHome tizimi yuklanmoqda...' : 'Загрузка системы SmartHome...'}
             </p>
           </div>
         ) : (
           <>
-            {tab === 0 && (
+            {tab === 0 && selectedDeviceId && devices.some((device) => device.id === selectedDeviceId) ? (
+              <DeviceDetailScreen device={devices.find((device) => device.id === selectedDeviceId)!} lang={lang} onBack={() => setSelectedDeviceId(null)} onTogglePower={handleTogglePower} />
+            ) : null}
+            {tab === 0 && !selectedDeviceId && (
               <HomeScreen
                 rooms={rooms}
                 devices={devices}
@@ -191,6 +196,7 @@ export function App() {
                 onTogglePower={handleTogglePower}
                 onRunQuickAction={handleRunQuickAction}
                 onOpen3DView={() => setIs3DOpen(true)}
+                onOpenDevice={(device) => setSelectedDeviceId(device.id)}
                 lang={lang}
               />
             )}
@@ -205,9 +211,9 @@ export function App() {
       <div className="app-bottom-nav fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-sm control-center-panel rounded-full px-3 py-1.5 shadow-2xl flex items-center justify-between">
         {/* Tab 0: Home */}
         <button
-          onClick={() => setTab(0)}
+          onClick={() => { setTab(0); setSelectedDeviceId(null); }}
           className={`flex flex-col items-center py-1 px-3 rounded-full transition cursor-pointer ${
-            tab === 0 ? 'text-[#0A84FF] font-semibold' : 'text-white/50 hover:text-white'
+            tab === 0 ? 'text-[#F07837] font-semibold' : 'text-white/50 hover:text-white'
           }`}
         >
           <Home className="w-4 h-4" />
@@ -216,9 +222,9 @@ export function App() {
 
         {/* Tab 1: Energy */}
         <button
-          onClick={() => setTab(1)}
+          onClick={() => { setTab(1); setSelectedDeviceId(null); }}
           className={`flex flex-col items-center py-1 px-3 rounded-full transition cursor-pointer ${
-            tab === 1 ? 'text-[#0A84FF] font-semibold' : 'text-white/50 hover:text-white'
+            tab === 1 ? 'text-[#F07837] font-semibold' : 'text-white/50 hover:text-white'
           }`}
         >
           <Zap className="w-4 h-4" />
@@ -229,16 +235,16 @@ export function App() {
         <button
           onClick={() => setIsVoiceOpen(true)}
           title={lang === 'uz' ? 'Ovozli yordamchi' : 'Голосовой помощник'}
-          className="w-11 h-11 rounded-full bg-[#0A84FF] hover:bg-[#0A84FF]/90 active:scale-95 text-white shadow-lg shadow-blue-500/30 flex items-center justify-center transition cursor-pointer flex-shrink-0"
+          className="w-11 h-11 rounded-full bg-[#F07837] hover:bg-[#F07837]/90 active:scale-95 text-white shadow-lg shadow-blue-500/30 flex items-center justify-center transition cursor-pointer flex-shrink-0"
         >
           <Mic className="w-5 h-5" />
         </button>
 
         {/* Tab 2: Scenes */}
         <button
-          onClick={() => setTab(2)}
+          onClick={() => { setTab(2); setSelectedDeviceId(null); }}
           className={`flex flex-col items-center py-1 px-3 rounded-full transition cursor-pointer ${
-            tab === 2 ? 'text-[#0A84FF] font-semibold' : 'text-white/50 hover:text-white'
+            tab === 2 ? 'text-[#F07837] font-semibold' : 'text-white/50 hover:text-white'
           }`}
         >
           <Sparkles className="w-4 h-4" />
@@ -247,9 +253,9 @@ export function App() {
 
         {/* Tab 3: Schedules */}
         <button
-          onClick={() => setTab(3)}
+          onClick={() => { setTab(3); setSelectedDeviceId(null); }}
           className={`flex flex-col items-center py-1 px-3 rounded-full transition cursor-pointer ${
-            tab === 3 ? 'text-[#0A84FF] font-semibold' : 'text-white/50 hover:text-white'
+            tab === 3 ? 'text-[#F07837] font-semibold' : 'text-white/50 hover:text-white'
           }`}
         >
           <Clock className="w-4 h-4" />

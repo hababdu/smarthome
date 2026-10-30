@@ -1,220 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import { Bolt, TrendingUp, Sparkles, AlertCircle, RefreshCw, DollarSign } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Bolt, TrendingDown, RefreshCw, AlertCircle, DollarSign, CalendarDays, Droplets, Refrigerator, Lightbulb, Snowflake } from 'lucide-react';
 import { EnergyReport, Language } from '../types';
 import { fetchEnergy, updateTariff } from '../services/api';
 
-interface EnergyScreenProps {
-  lang: Language;
-}
-
-export const EnergyScreen: React.FC<EnergyScreenProps> = ({ lang }) => {
-  const [report, setReport] = useState<EnergyReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isEditingTariff, setIsEditingTariff] = useState(false);
-  const [customTariff, setCustomTariff] = useState('1000');
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchEnergy(lang);
-      setReport(data);
-      setCustomTariff(String(data.tariff || 1000));
-    } catch (err: any) {
-      setError(err.message || 'Error loading energy data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, [lang]);
-
-  const handleSaveTariff = async () => {
-    const val = Number(customTariff);
-    if (val > 0) {
-      await updateTariff(val);
-      setIsEditingTariff(false);
-      loadData();
-    }
-  };
-
-  if (loading && !report) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[350px] text-white/50 gap-3">
-        <RefreshCw className="w-8 h-8 animate-spin text-[#0A84FF]" />
-        <p className="text-sm font-medium">{lang === 'uz' ? 'Ma\'lumotlar yuklanmoqda...' : 'Загрузка данных...'}</p>
-      </div>
-    );
-  }
-
-  if (error || !report) {
-    return (
-      <div className="control-tile rounded-2xl p-6 text-center text-[#FF453A] border-[#FF453A]/30 max-w-md mx-auto">
-        <AlertCircle className="w-8 h-8 mx-auto mb-2 text-[#FF453A]" />
-        <p className="text-sm">{error || 'Failed to load report'}</p>
-        <button
-          onClick={loadData}
-          className="mt-3 px-4 py-2 bg-[#FF453A] hover:bg-[#FF453A]/80 rounded-full text-xs text-white font-medium cursor-pointer transition"
-        >
-          {lang === 'uz' ? 'Qayta urinish' : 'Повторить'}
-        </button>
-      </div>
-    );
-  }
-
-  // Sorted per-device weekly consumption
-  const perDeviceEntries = Object.entries(report.week?.perDevice || {}).sort(
-    (a, b) => (b[1] || 0) - (a[1] || 0)
-  );
-  const maxWeeklyKwh = perDeviceEntries.length > 0 ? Math.max(0.001, perDeviceEntries[0][1]) : 1;
-
-  const periods = [
-    {
-      title: lang === 'uz' ? 'Bugun' : 'Сегодня',
-      data: report.day,
-      desc: lang === 'uz' ? '24 soat' : '24 ч.',
-    },
-    {
-      title: lang === 'uz' ? 'Hafta' : 'Неделя',
-      data: report.week,
-      desc: lang === 'uz' ? '7 kun' : '7 дней',
-    },
-    {
-      title: lang === 'uz' ? 'Oy' : 'Месяц',
-      data: report.month,
-      desc: lang === 'uz' ? '30 kun' : '30 дней',
-    },
-  ];
-
-  return (
-    <div className="space-y-4 pb-28 max-w-md mx-auto">
-      {/* Title & Refresh */}
-      <div className="flex items-center justify-between px-1">
-        <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
-            {lang === 'uz' ? 'Energiya sarfi' : 'Энергия и затраты'}
-          </h2>
-          <p className="text-[11px] text-white/50">
-            {lang === 'uz' ? 'Elektr hisoboti va tahlili' : 'Аналитика и расходы'}
-          </p>
-        </div>
-
-        <button
-          onClick={loadData}
-          className="w-8 h-8 rounded-full bg-white/[0.08] hover:bg-white/[0.14] text-white flex items-center justify-center transition cursor-pointer"
-          title="Yangilash"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {/* 3 Apple-Style Capsule Cards */}
-      <div className="control-center-panel rounded-3xl p-3.5 space-y-3">
-        <div className="grid grid-cols-3 gap-2">
-          {periods.map((p, idx) => (
-            <div
-              key={idx}
-              className="control-tile rounded-2xl p-3 flex flex-col justify-between"
-            >
-              <div className="text-[11px] font-semibold text-white/60 flex items-center justify-between">
-                <span>{p.title}</span>
-                <Bolt className="w-3 h-3 text-[#FF9F0A]" />
-              </div>
-              <div className="mt-2 text-lg font-mono font-bold text-white">
-                {p.data?.kwh.toFixed(1)}{' '}
-                <span className="text-[10px] font-normal text-white/50">kWh</span>
-              </div>
-              <div className="text-[11px] text-[#0A84FF] font-medium mt-1 truncate">
-                ~{p.data?.cost?.toLocaleString() || 0} {lang === 'uz' ? "so'm" : 'сум'}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Tariff Capsule Bar */}
-        <div className="control-tile rounded-2xl p-3 flex items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-white/70">
-            <div className="w-7 h-7 rounded-full bg-[#30D158] flex items-center justify-center text-white">
-              <DollarSign className="w-3.5 h-3.5" />
-            </div>
-            <span>
-              {lang === 'uz' ? 'Tarif:' : 'Тариф:'}{' '}
-              <strong className="text-white font-mono">{report.tariff}</strong> {lang === 'uz' ? "so'm/kWh" : 'сум'}
-            </span>
-          </div>
-
-          {isEditingTariff ? (
-            <div className="flex items-center gap-1.5">
-              <input
-                type="number"
-                value={customTariff}
-                onChange={(e) => setCustomTariff(e.target.value)}
-                className="w-16 px-2 py-1 bg-white/[0.1] border border-white/20 rounded-lg text-white text-xs font-mono"
-              />
-              <button
-                onClick={handleSaveTariff}
-                className="px-2.5 py-1 bg-[#0A84FF] rounded-full text-white font-medium text-[11px] cursor-pointer"
-              >
-                OK
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setIsEditingTariff(true)}
-              className="text-[#0A84FF] hover:underline font-medium text-[11px] cursor-pointer"
-            >
-              {lang === 'uz' ? 'O\'zgartirish' : 'Изменить'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Weekly Consumption Ranking in Control Center Container */}
-      <div className="control-center-panel rounded-3xl p-3.5 space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <span className="font-semibold text-xs text-white flex items-center gap-1.5">
-            <TrendingUp className="w-3.5 h-3.5 text-[#0A84FF]" />
-            {lang === 'uz' ? 'Haftalik sarf qurilmalar bo\'yicha' : 'Расход устройств за неделю'}
-          </span>
-          <span className="text-[11px] text-white/40">{perDeviceEntries.length} {lang === 'uz' ? 'qurilma' : 'устройств'}</span>
-        </div>
-
-        <div className="space-y-2.5">
-          {perDeviceEntries.map(([devId, kwh]) => {
-            const ratio = Math.max(0.06, kwh / maxWeeklyKwh);
-            return (
-              <div key={devId} className="control-tile rounded-2xl p-2.5 space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="font-medium text-white capitalize">{devId.replace('-', ' ')}</span>
-                  <span className="font-mono text-white/60 text-[11px]">{kwh.toFixed(2)} kWh</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-white/[0.1] overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#0A84FF] to-[#64D2FF] rounded-full transition-all duration-300"
-                    style={{ width: `${ratio * 100}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Saving Tips */}
-      <div className="control-tile rounded-3xl p-3.5 space-y-2 border-[#30D158]/30 bg-[#30D158]/10">
-        <div className="text-xs font-semibold text-[#30D158] flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>{lang === 'uz' ? 'Tejash tavsiyalari' : 'Советы по экономии'}</span>
-        </div>
-        <div className="space-y-1 text-xs text-white/80 leading-relaxed pl-1">
-          {report.tips && report.tips.map((tip, i) => (
-            <p key={i}>• {tip}</p>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+type Period = 'day'|'week'|'month'|'year';
+export const EnergyScreen: React.FC<{lang:Language}> = ({lang}) => {
+ const [report,setReport]=useState<EnergyReport|null>(null); const [loading,setLoading]=useState(true); const [error,setError]=useState<string|null>(null); const [editing,setEditing]=useState(false); const [tariff,setTariff]=useState('1000'); const [period,setPeriod]=useState<Period>('week');
+ const tr=(uz:string,ru:string)=>lang==='uz'?uz:ru;
+ const load=async()=>{try{setLoading(true);setError(null);const data=await fetchEnergy(lang);setReport(data);setTariff(String(data.tariff||1000));}catch(e:any){setError(e.message||'Energy data error');}finally{setLoading(false)}};
+ useEffect(()=>{load()},[lang]);
+ const data=report?.[period==='year'?'month':period];
+ const entries=useMemo(()=>Object.entries(data?.perDevice||{}).sort((a,b)=>b[1]-a[1]),[data]);
+ const max= Math.max(1,...entries.map(([,v])=>v));
+ const icons=[Snowflake,Droplets,Refrigerator,Lightbulb];
+ if(loading&&!report) return <div className="energy-screen"><div className="control-tile rounded-2xl p-8 text-center app-muted"><RefreshCw className="animate-spin mx-auto mb-3"/><p>{tr('Ma’lumotlar yuklanmoqda...','Загрузка данных...')}</p></div></div>;
+ if(error||!report) return <div className="energy-screen control-tile rounded-2xl p-6 text-center"><AlertCircle className="mx-auto mb-2 text-orange-400"/><p>{error||'Energy data unavailable'}</p><button className="energy-refresh mt-4" onClick={load}>{tr('Qayta urinish','Повторить')}</button></div>;
+ return <div className="energy-screen space-y-4 pb-28">
+  <header className="energy-header"><div><h1>{tr('Energiya sarfi','Energy Usage')}</h1><p>{tr('Uy energiyasi statistikasi','Статистика энергопотребления')}</p></div><button className="energy-calendar" onClick={load} aria-label="Refresh"><CalendarDays size={17}/></button></header>
+  <div className="period-switch">{(['day','week','month','year'] as Period[]).map(p=><button key={p} className={period===p?'active':''} onClick={()=>setPeriod(p)}>{({day:tr('Kun','Day'),week:tr('Hafta','Week'),month:tr('Oy','Month'),year:tr('Yil','Year')} as Record<Period,string>)[p]}</button>)}</div>
+  <div className="energy-stats-grid"><article className="energy-stat"><div className="energy-stat-label">{tr('Jami sarf','Total Usage')} <span><Bolt size={14}/></span></div><strong>{period==='year'?'—':data?.kwh.toFixed(1)} <small>kWh</small></strong><p><TrendingDown size={12}/> {tr('Tanlangan davr','Selected period')}</p></article><article className="energy-stat"><div className="energy-stat-label">{tr('Jami xarajat','Total Cost')} <span><DollarSign size={14}/></span></div><strong>{period==='year'?'—':`$${(Number(data?.cost||0)/12500).toFixed(2)}`}</strong><p><TrendingDown size={12}/> {tr('Tarif bo‘yicha hisob','Based on tariff')}</p></article></div>
+  <section className="energy-panel"><div className="section-heading"><h2>{tr('Sarf tahlili','Usage Overview')}</h2><span className="app-muted text-xs">kWh</span></div>{period==='year'?<div className="energy-empty">{tr('Yillik statistika uchun ko‘proq tarixiy ma’lumot kerak.','Annual view needs more historical data.')}</div>:entries.length===0?<div className="energy-empty">{tr('Hozircha energiya ma’lumoti yo‘q','No energy data yet')}</div>:<><div className="energy-chart" role="img" aria-label={tr('Qurilmalar bo‘yicha energiya sarfi','Energy use by device')}>{[.25,.5,.75,1].map(t=><div key={t} className="chart-gridline"><span>{(max*t).toFixed(0)}</span><i/></div>)}<div className="energy-bars">{entries.slice(0,7).map(([name,value],i)=><div className="energy-bar-column" key={name}><div className="energy-bar" style={{height:`${Math.max(5,value/max*100)}%`,background:i===0?'#f07837':'linear-gradient(180deg,#ffad5c,#e9692d)'}}/><span>{name.replace(/-/g,' ').replace(/light/ig,'LED').slice(0,8)}</span></div>)}</div></div><div className="energy-chart-caption">{tr('Qurilmalar bo‘yicha haqiqiy qayd etilgan sarf','Recorded consumption by device')}</div></>}</section>
+  <section className="energy-panel"><div className="section-heading"><h2>{tr('Ko‘p energiya sarflovchilar','Top Energy Consumers')}</h2><span className="app-muted text-xs">{entries.length}</span></div><div className="consumer-list">{entries.slice(0,5).map(([name,value],i)=>{const Icon=icons[i%icons.length];return <div className="consumer-row" key={name}><div className="consumer-icon"><Icon size={16}/></div><div className="consumer-main"><div className="consumer-title"><b>{name.replace(/-/g,' ')}</b><span>{value.toFixed(1)} kWh</span></div><div className="consumer-track"><i style={{width:`${Math.max(4,value/max*100)}%`}}/></div></div><span className="consumer-percent">{Math.round(value/Math.max(.01,entries.reduce((sum,[,v])=>sum+v,0))*100)}%</span></div>})}</div></section>
+  <section className="energy-panel tariff-panel"><div className="tariff-copy"><span className="tariff-icon"><DollarSign size={17}/></span><div><h2>{tr('Elektr tarifi','Electricity tariff')}</h2><p>{report.tariff} {tr('so‘m/kWh','UZS/kWh')}</p></div></div>{editing?<div className="tariff-edit"><input aria-label="Tariff" type="number" min="1" value={tariff} onChange={e=>setTariff(e.target.value)}/><button onClick={async()=>{if(Number(tariff)>0){await updateTariff(Number(tariff));setEditing(false);load()}}}>OK</button></div>:<button className="energy-refresh" onClick={()=>setEditing(true)}>{tr('O‘zgartirish','Edit')}</button>}</section>
+  {report.tips?.length>0&&<section className="energy-tips"><h2>{tr('Tejash tavsiyalari','Energy saving tips')}</h2>{report.tips.slice(0,2).map((tip,i)=><p key={i}>• {tip}</p>)}</section>}
+ </div>;
 };

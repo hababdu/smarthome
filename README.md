@@ -64,3 +64,7 @@ Bu tokenni mobil ilova ichidan ham chiqarib olish mumkin; internetga mo'ljallang
 ## Test qamrovi
 
 Unit testlar asosiy NLU, xavfsizlik va energiya integratsiyasini tekshiradi. Ular API autentifikatsiyasi, haqiqiy MQTT broker, ESP32 apparati yoki elektr xavfsizligini to'liq tasdiqlamaydi; bu yo'nalishlar alohida integratsion va laboratoriya sinovlarini talab qiladi.
+
+## Figma-ready design kit
+
+The `figma-kit/` directory contains editable/importable SVG mockups for onboarding, the mobile home dashboard, bedroom controls, energy usage, and a desktop dashboard, plus design tokens and a component inventory. See `figma-kit/README.md` for import instructions. These are Figma-importable SVG assets, not a native `.fig` file.

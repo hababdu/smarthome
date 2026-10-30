@@ -1,0 +1,74 @@
+[
+  {
+    "id": "touch_control_panel",
+    "name": "Touch control panel",
+    "file": "assets/touch_control_panel.png",
+    "category": "lighting"
+  },
+  {
+    "id": "smart_plug",
+    "name": "Smart plug",
+    "file": "assets/smart_plug.png",
+    "category": "power"
+  },
+  {
+    "id": "adjustable_spotlight",
+    "name": "Adjustable spotlight",
+    "file": "assets/adjustable_spotlight.png",
+    "category": "lighting"
+  },
+  {
+    "id": "recessed_downlight",
+    "name": "Recessed downlight",
+    "file": "assets/recessed_downlight.png",
+    "category": "lighting"
+  },
+  {
+    "id": "pendant_bulb",
+    "name": "Pendant bulb",
+    "file": "assets/pendant_bulb.png",
+    "category": "lighting"
+  },
+  {
+    "id": "wall_sconce",
+    "name": "Wall sconce",
+    "file": "assets/wall_sconce.png",
+    "category": "lighting"
+  },
+  {
+    "id": "led_strip",
+    "name": "LED strip",
+    "file": "assets/led_strip.png",
+    "category": "lighting"
+  },
+  {
+    "id": "table_lamp",
+    "name": "Table lamp",
+    "file": "assets/table_lamp.png",
+    "category": "lighting"
+  },
+  {
+    "id": "floor_lamp",
+    "name": "Floor lamp",
+    "file": "assets/floor_lamp.png",
+    "category": "lighting"
+  },
+  {
+    "id": "ceiling_panel",
+    "name": "Ceiling panel",
+    "file": "assets/ceiling_panel.png",
+    "category": "lighting"
+  },
+  {
+    "id": "smart_thermostat",
+    "name": "Smart thermostat",
+    "file": "assets/smart_thermostat.png",
+    "category": "control"
+  },
+  {
+    "id": "motion_sensor",
+    "name": "Motion sensor",
+    "file": "assets/motion_sensor.png",
+    "category": "sensor"
+  }
+]
