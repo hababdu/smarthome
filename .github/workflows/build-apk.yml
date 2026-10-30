@@ -78,9 +78,16 @@ jobs:
           API_URL: ${{ secrets.API_URL || vars.API_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN || vars.API_TOKEN }}
         run: |
+          set -o pipefail
           flutter build apk --release \
             --dart-define=API_URL="$API_URL" \
-            --dart-define=API_TOKEN="$API_TOKEN"
+            --dart-define=API_TOKEN="$API_TOKEN" 2>&1 | tee build.log
+
+      # Xato bo'lsa, Dart xatolarini annotation sifatida ko'rsatadi
+      - name: Xatolarni ko'rsatish
+        if: failure()
+        run: |
+          grep -E "Error:|error •|lib/.*: *Error" build.log | head -15 | while IFS= read -r l; do echo "::error::${l:0:300}"; done || true
 
       - uses: actions/upload-artifact@v4
         with:
