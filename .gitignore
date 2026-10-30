@@ -3,3 +3,5 @@ backend/.env
 backend/data.json
 build/
 .dart_tool/
+dist/
+package-lock.json

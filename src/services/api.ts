@@ -1,12 +1,26 @@
 import { HomeSnapshot, EnergyReport, Scene, Schedule, VoiceResponse } from '../types';
 
-const API_TOKEN = import.meta.env.VITE_API_TOKEN || '';
+const TOKEN_KEY = 'smarthome-api-token';
 
-if (!API_TOKEN) console.warn('VITE_API_TOKEN sozlanmagan. API so‘rovlari autentifikatsiyadan o‘tmaydi.');
+export function getToken(): string {
+  try { return localStorage.getItem(TOKEN_KEY) || import.meta.env.VITE_API_TOKEN || ''; }
+  catch { return import.meta.env.VITE_API_TOKEN || ''; }
+}
 
-const headers = {
+export function setToken(token: string) {
+  try { localStorage.setItem(TOKEN_KEY, token); } catch { /* Storage may be unavailable. */ }
+  headers.Authorization = `Bearer ${token}`;
+}
+
+export function clearToken() {
+  try { localStorage.removeItem(TOKEN_KEY); } catch { /* Storage may be unavailable. */ }
+  headers.Authorization = 'Bearer ';
+}
+
+// Obyekt havolasi o'zgarmaydi, shuning uchun token almashganda barcha so'rovlar yangisini ishlatadi.
+const headers: Record<string, string> = {
   'Content-Type': 'application/json',
-  Authorization: `Bearer ${API_TOKEN}`,
+  Authorization: `Bearer ${getToken()}`,
 };
 
 export async function fetchHome(): Promise<HomeSnapshot> {
@@ -123,7 +137,7 @@ export function createWebSocket(
 
   function connect() {
     if (isClosedExplicitly) return;
-    if (!API_TOKEN) { onStatusChange?.(false); console.error('VITE_API_TOKEN sozlanmagan'); return; }
+    if (!getToken()) { onStatusChange?.(false); return; }
     try {
       fetch('/api/ws-ticket', { method: 'POST', headers })
         .then(async (res) => {
