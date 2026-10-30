@@ -1,0 +1,73 @@
+name: Build iOS IPA (imzosiz)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secret'larni tekshirish
+        env:
+          API_URL: ${{ secrets.API_URL || vars.API_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN || vars.API_TOKEN }}
+        run: |
+          if [ -z "$API_URL" ] || [ -z "$API_TOKEN" ]; then
+            echo "::error::API_URL yoki API_TOKEN secret'i kiritilmagan. Settings -> Secrets and variables -> Actions bo'limida qo'shing."
+            exit 1
+          fi
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Repoda ios/ papkasi yo'q, shuning uchun uni yaratamiz.
+      # lib/ va pubspec.yaml o'zgarmasligi uchun zaxiradan tiklaymiz.
+      - name: iOS platformasini yaratish
+        run: |
+          cp -r lib /tmp/lib_backup
+          cp pubspec.yaml /tmp/pubspec_backup.yaml
+          flutter create --platforms=ios --org com.hababdu --project-name smarthome_assistant .
+          rm -rf lib && cp -r /tmp/lib_backup lib
+          cp /tmp/pubspec_backup.yaml pubspec.yaml
+
+      # Mikrofon, nutqni aniqlash, lokal tarmoq va oddiy http:// (LAN server) ruxsatlari
+      - name: Info.plist ni sozlash
+        run: |
+          PLIST=ios/Runner/Info.plist
+          PB=/usr/libexec/PlistBuddy
+          $PB -c "Add :NSMicrophoneUsageDescription string 'Ovozli buyruqlar uchun mikrofon kerak'" $PLIST
+          $PB -c "Add :NSSpeechRecognitionUsageDescription string 'Ovozli buyruqlarni tanish uchun kerak'" $PLIST
+          $PB -c "Add :NSLocalNetworkUsageDescription string 'Uy serveriga ulanish uchun kerak'" $PLIST
+          $PB -c "Add :NSAppTransportSecurity dict" $PLIST
+          $PB -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" $PLIST
+          $PB -c "Print" $PLIST
+
+      - run: flutter pub get
+
+      - name: Imzosiz iOS build
+        env:
+          API_URL: ${{ secrets.API_URL || vars.API_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN || vars.API_TOKEN }}
+        run: |
+          flutter build ios --release --no-codesign \
+            --dart-define=API_URL="$API_URL" \
+            --dart-define=API_TOKEN="$API_TOKEN"
+
+      - name: IPA yaratish
+        run: |
+          mkdir -p build/ipa/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ipa/Payload/
+          cd build/ipa
+          zip -qr smarthome.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smarthome-ipa
+          path: mobile/build/ipa/smarthome.ipa
